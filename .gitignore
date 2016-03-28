@@ -1,0 +1,4 @@
+*~
+*.pyc
+*.caffemodel
+roi_data_layer/
