@@ -1,7 +1,7 @@
 import cv2
 import os
 import sys
-sys.path.append("/home/syc/caffe-new/python")
+sys.path.append("/home/syc/py-faster-rcnn/caffe-fast-rcnn/python")
 import caffe
 import numpy as np
 import random
@@ -10,11 +10,11 @@ from math import *
 from utils import *
 from DataBase import DataBase
 
-video_dir = "../../dataset/"
-video_name = "tiger2"
+video_dir = '/media/syc/My Passport/_dataset/tracking2013/'
+video_name = "Shaking/img"
 video_transpose = False
 video_resize = (960, 540)
-bbox = 32,60,68,78
+bbox = 225,135,61,71
 # bbox = 100,20,60,60
 (x,y,w,h) = bbox
 
@@ -61,12 +61,14 @@ class DeepTracker:
         x,y,w,h = bbox
         cv2.imwrite('data/%d.jpg'%idx, frame[y:y+h,x:x+w,:])
 
-    def makeLabels(self, w_sm, h_sm, scale_out = 0.12, scale_in = 0.06):
+    def makeLabels(self, bbox, box_large, w_sm, h_sm, range_out = 10, range_in = 4, scale=0.25):
+        (_x,_y,_w,_h) =  bbox
+        (x,y,w,h) = box_large
         labels = np.zeros((1,h_sm,w_sm))
-        rad_out = scale_out*min(w_sm,h_sm)
-        rad_in = scale_in*min(w_sm,h_sm)
-        cx = 0.5*w_sm
-        cy = 0.5*h_sm
+        rad_out = scale*range_out
+        rad_in = scale*range_in
+        cx = scale*(_x-x)
+        cy = scale*(_y-y)
         labels[0, rdint(cy-rad_out):rdint(cy+rad_out), rdint(cx-rad_out):rdint(cx+rad_out)] = -1
         labels[0, rdint(cy-rad_in):rdint(cy+rad_in), rdint(cx-rad_in):rdint(cx+rad_in)] = 1
         print "*****************************"
@@ -84,16 +86,17 @@ class DeepTracker:
         self.featnet.blobs['rois'].reshape(w_feat*h_feat,5)
         for i in range(w_feat):
             for j in range(h_feat):
-                idx = j + i*w_feat
+                idx = j + i*h_feat
                 self.featnet.blobs['rois'].data[idx] = np.array([0,4*i,4*j,4*i+_w,4*j+_h])
         self.featnet.forward()
         pool = self.featnet.blobs['roi_pool_conv5'].data
-        c_pool = pool.shape[1]*pool.shape[2]*pool.shape[3]
-        feat = np.zeros((c_pool,h_feat,w_feat))
-        for i in range(w_feat):
-            for j in range(w_feat):
-                idx = j + i*w_feat
-                feat[:,j,i] = pool[idx].flatten()
+        # c_pool = pool.shape[1]*pool.shape[2]*pool.shape[3]
+        # feat = np.zeros((c_pool,h_feat,w_feat))
+        # for i in range(w_feat):
+        #     for j in range(w_feat):
+        #         idx = j + i*w_feat
+        #         feat[:,j,i] = pool[idx].flatten()
+        feat = pool.reshape(w_feat,h_feat,1024).transpose((2,1,0))
         return feat
 
     def update(self, frame, bbox ,step = 32):
@@ -101,7 +104,7 @@ class DeepTracker:
         (x,y,w,h) = box_large = padding(bbox, 0.6)
         feat = self.getFeat(frame, bbox, box_large)
         (c_sm, h_sm, w_sm) = feat.shape
-        labels = self.makeLabels(w_sm, h_sm)
+        labels = self.makeLabels(bbox,box_large,w_sm, h_sm)
 
         self.solver.net.blobs['data'].reshape(1,c_sm,h_sm,w_sm)
         self.solver.net.blobs['data'].data[0] = feat
@@ -129,17 +132,14 @@ class DeepTracker:
         self.solver.net.blobs['data'].data[0] = feat
         self.solver.net.forward()
 
-        ww = w - _w
-        hh = h - _h
+
         score = softmax(self.solver.net.blobs['score'].data[0])
-        score_big = cv2.resize(score, (ww,hh))
+        score_big = cv2.resize(score, (4*w_sm,4*h_sm))
         self.prob = score_big.copy() ##
-        cx = score_big.argmax() % ww
-        cy = score_big.argmax() // hh
-        dx = rdint(cx - 0.5*ww)
-        dy = rdint(cy - 0.5*hh)
-        _x += dx
-        _y += dy
+        dx = score_big.argmax() % (4*w_sm)
+        dy = score_big.argmax() // (4*w_sm)
+        _x = x+dx
+        _y = y+dy
         bbox = (_x,_y,_w,_h)
 
         self.update(frame, bbox)

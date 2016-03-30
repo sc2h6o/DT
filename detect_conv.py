@@ -1,7 +1,7 @@
 import cv2
 import os
 import sys
-sys.path.append("/home/syc/caffe-new/python")
+sys.path.append("/home/syc/py-faster-rcnn/caffe-fast-rcnn/python")
 import caffe
 import numpy as np
 import random
@@ -10,11 +10,11 @@ from math import *
 from utils import *
 from DataBase import DataBase
 
-video_dir = "../../dataset/"
-video_name = "shaking"
+video_dir = '/media/syc/My Passport/_dataset/tracking2013/'
+video_name = "Liquor/img"
 video_transpose = False
 video_resize = (960, 540)
-bbox = 225,135,60,70
+bbox = 256,152,73,210
 # bbox = 100,20,60,60
 (x,y,w,h) = bbox
 
@@ -31,7 +31,7 @@ proto_feat = model_dir + 'feat.prototxt'
 model_feat =  model_dir + "ZF_faster_rcnn_final.caffemodel"
 # mean_file = model_dir + 'ilsvrc_2012_mean.npy'
 
-target_size = 224
+target_size = 80.0
 
 class DeepTracker:
     def __init__(self):
@@ -102,6 +102,10 @@ class DeepTracker:
         self.solver = caffe.SGDSolver(proto_solver)
         self.featnet = caffe.Net(proto_feat,model_feat,caffe.TEST)
 
+        # (_x,_y,_w,_h) = bbox
+        # scale = target_size / max(_w,_h)
+        # (_x,_y,_w,_h) = bbox = scaleBox(bbox, scale)
+        # frame = cv2.resize(frame,(0,0),fx=scale,fy=scale)
         self.update(frame, bbox, 2048)
         
         self.inited = True
@@ -109,10 +113,15 @@ class DeepTracker:
 
     def track(self, frame, bbox):
         (_x,_y,_w,_h) = bbox
+        # scale = target_size / max(_w,_h)
+        # (_x,_y,_w,_h) = bbox = scaleBox(bbox, scale)
+        # frame = cv2.resize(frame,(0,0),fx=scale,fy=scale)
+
         (x,y,w,h) = box_large = padding(bbox, 0.6)
         feat = self.getFeat(frame, box_large)
         (c_sm, h_sm, w_sm) = feat.shape
         self.solver.net.blobs['data'].reshape(1,c_sm,h_sm,w_sm)
+        self.solver.net.blobs['labels'].reshape(1,1,h_sm, w_sm)
         self.solver.net.blobs['data'].data[0] = feat
         self.solver.net.forward()
 
@@ -126,7 +135,7 @@ class DeepTracker:
         bbox = (_x,_y,_w,_h)
 
         self.update(frame, bbox)
-        return bbox
+        return scaleBox(bbox,1/scale)
 
 
 
