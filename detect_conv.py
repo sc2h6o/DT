@@ -11,10 +11,10 @@ from utils import *
 from DataBase import DataBase
 
 video_dir = '/media/syc/My Passport/_dataset/tracking2013/'
-video_name = "Liquor/img"
+video_name = "BlurCar1/img"
 video_transpose = False
 video_resize = (960, 540)
-bbox = 256,152,73,210
+bbox = 250,168,106,105
 # bbox = 100,20,60,60
 (x,y,w,h) = bbox
 
@@ -61,17 +61,31 @@ class DeepTracker:
         x,y,w,h = bbox
         cv2.imwrite('data/%d.jpg'%idx, frame[y:y+h,x:x+w,:])
 
-    def makeLabels(self, box_large, w_sm, h_sm, range_out = 10, range_in = 4, scale=0.25):
+    def makeLabels(self, bbox, box_large, w_sm, h_sm, range_out = 10, range_in = 4, scale=0.25):
+        (_x,_y,_w,_h) = bbox
         (x,y,w,h) = box_large
         labels = np.zeros((1,h_sm,w_sm))
         rad_out = scale*range_out
         rad_in = scale*range_in
-        cx = scale*0.5*w
-        cy = scale*0.5*h
+        cx = scale*(_x+0.5*_w-x)
+        cy = scale*(_y+0.5*_h-y)
+        x1 = scale*(_x-x)
+        y1 = scale*(_y-x)
+        x2 = scale*(_x+_w-x)
+        y2 = scale*(_y+_h-x)
+
         labels[0, rdint(cy-rad_out):rdint(cy+rad_out), rdint(cx-rad_out):rdint(cx+rad_out)] = -1
+        # labels[0, rdint(y1-rad_out):rdint(y1+rad_out), rdint(x1-rad_out):rdint(x1+rad_out)] = -1
+        # labels[0, rdint(y2-rad_out):rdint(y2+rad_out), rdint(x1-rad_out):rdint(x1+rad_out)] = -1
+        # labels[0, rdint(y1-rad_out):rdint(y1+rad_out), rdint(x2-rad_out):rdint(x2+rad_out)] = -1
+        # labels[0, rdint(y2-rad_out):rdint(y2+rad_out), rdint(x2-rad_out):rdint(x2+rad_out)] = -1
         labels[0, rdint(cy-rad_in):rdint(cy+rad_in), rdint(cx-rad_in):rdint(cx+rad_in)] = 1
-        print "*****************************"
-        print (w_sm,h_sm,rad_out,rad_in)
+        # labels[0, rdint(y1-rad_in):rdint(y1+rad_in), rdint(x1-rad_in):rdint(x1+rad_in)] = 2
+        # labels[0, rdint(y2-rad_in):rdint(y2+rad_in), rdint(x1-rad_in):rdint(x1+rad_in)] = 3
+        # labels[0, rdint(y1-rad_in):rdint(y1+rad_in), rdint(x2-rad_in):rdint(x2+rad_in)] = 4
+        # labels[0, rdint(y2-rad_in):rdint(y2+rad_in), rdint(x2-rad_in):rdint(x2+rad_in)] = 5
+        # print "*****************************"
+        # print (w_sm,h_sm,rad_out,rad_in)
         return labels
 
     def getFeat(self, frame, box_large):
@@ -80,15 +94,17 @@ class DeepTracker:
         self.featnet.blobs['data'].reshape(1,3,h,w)
         self.featnet.blobs['data'].data[0] = data
         self.featnet.forward()
-        feat = self.featnet.blobs['conv5'].data[0]
+        f1= self.featnet.blobs['conv3'].data[0]
+        f2= self.featnet.blobs['conv5'].data[0]
+        feat = np.concatenate([f1,f2],axis=0)
         return feat
 
     def update(self, frame, bbox ,step = 32):
         t1 = time.clock()
-        (x,y,w,h) = box_large = padding(bbox, 0.6)
+        (x,y,w,h) = box_large = padding(bbox, 1.0)
         feat = self.getFeat(frame, box_large)
         (c_sm, h_sm, w_sm) = feat.shape
-        labels = self.makeLabels(box_large, w_sm, h_sm)
+        labels = self.makeLabels(bbox, box_large, w_sm, h_sm)
 
         self.solver.net.blobs['data'].reshape(1,c_sm,h_sm,w_sm)
         self.solver.net.blobs['data'].data[0] = feat
@@ -117,7 +133,8 @@ class DeepTracker:
         # (_x,_y,_w,_h) = bbox = scaleBox(bbox, scale)
         # frame = cv2.resize(frame,(0,0),fx=scale,fy=scale)
 
-        (x,y,w,h) = box_large = padding(bbox, 0.6)
+        (x,y,w,h) = box_large = padding(bbox, 0.7)
+        print '```````````````````', box_large
         feat = self.getFeat(frame, box_large)
         (c_sm, h_sm, w_sm) = feat.shape
         self.solver.net.blobs['data'].reshape(1,c_sm,h_sm,w_sm)
@@ -125,16 +142,21 @@ class DeepTracker:
         self.solver.net.blobs['data'].data[0] = feat
         self.solver.net.forward()
 
+
+        
         score = softmax(self.solver.net.blobs['score'].data[0])
+        # color = softmaxColor(self.solver.net.blobs['score'].data[0])
+        # color = cv2.resize(color, (w_sm*4,h_sm*4))
         score_big = cv2.resize(score, (w_sm*4,h_sm*4))
         self.prob = score_big.copy() ##
-        cx = score_big.argmax() % (4*w_sm)
-        cy = score_big.argmax() // (4*w_sm)
-        _x += rdint(cx - 0.5*w)
-        _y += rdint(cy - 0.5*h)
-        bbox = (_x,_y,_w,_h)
-
-        self.update(frame, bbox)
+        print self.prob.shape
+        if score_big.max() > 0.00:
+            cx = score_big.argmax() % (4*w_sm)
+            cy = score_big.argmax() // (4*w_sm)
+            _x = rdint(x + cx - 0.5*_w)
+            _y = rdint(y + cy - 0.5*_h)
+            bbox = (_x,_y,_w,_h)
+            self.update(frame, bbox)
         return scaleBox(bbox,1/scale)
 
 

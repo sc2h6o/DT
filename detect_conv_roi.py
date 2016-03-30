@@ -61,7 +61,7 @@ class DeepTracker:
         x,y,w,h = bbox
         cv2.imwrite('data/%d.jpg'%idx, frame[y:y+h,x:x+w,:])
 
-    def makeLabels(self, bbox, box_large, w_sm, h_sm, range_out = 10, range_in = 4, scale=0.25):
+    def makeLabels(self, bbox, box_large, w_sm, h_sm, range_out = 12, range_in = 6, scale=0.25):
         (_x,_y,_w,_h) =  bbox
         (x,y,w,h) = box_large
         labels = np.zeros((1,h_sm,w_sm))
@@ -71,8 +71,6 @@ class DeepTracker:
         cy = scale*(_y-y)
         labels[0, rdint(cy-rad_out):rdint(cy+rad_out), rdint(cx-rad_out):rdint(cx+rad_out)] = -1
         labels[0, rdint(cy-rad_in):rdint(cy+rad_in), rdint(cx-rad_in):rdint(cx+rad_in)] = 1
-        print "*****************************"
-        print (w_sm,h_sm,rad_out,rad_in)
         return labels
 
     def getFeat(self, frame, bbox, box_large):
@@ -89,14 +87,15 @@ class DeepTracker:
                 idx = j + i*h_feat
                 self.featnet.blobs['rois'].data[idx] = np.array([0,4*i,4*j,4*i+_w,4*j+_h])
         self.featnet.forward()
-        pool = self.featnet.blobs['roi_pool_conv5'].data
+        pool = self.featnet.blobs['fc6'].data
+
         # c_pool = pool.shape[1]*pool.shape[2]*pool.shape[3]
         # feat = np.zeros((c_pool,h_feat,w_feat))
         # for i in range(w_feat):
         #     for j in range(w_feat):
         #         idx = j + i*w_feat
         #         feat[:,j,i] = pool[idx].flatten()
-        feat = pool.reshape(w_feat,h_feat,1024).transpose((2,1,0))
+        feat = pool.reshape(w_feat,h_feat,4096).transpose((2,1,0))
         return feat
 
     def update(self, frame, bbox ,step = 32):
@@ -129,10 +128,11 @@ class DeepTracker:
         feat = self.getFeat(frame, bbox, box_large)
         (c_sm, h_sm, w_sm) = feat.shape
         self.solver.net.blobs['data'].reshape(1,c_sm,h_sm,w_sm)
+        self.solver.net.blobs['labels'].reshape(1,1,h_sm, w_sm)
         self.solver.net.blobs['data'].data[0] = feat
         self.solver.net.forward()
 
-
+        print self.solver.net.blobs['score'].data[0,2]
         score = softmax(self.solver.net.blobs['score'].data[0])
         score_big = cv2.resize(score, (4*w_sm,4*h_sm))
         self.prob = score_big.copy() ##
