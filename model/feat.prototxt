@@ -2,16 +2,16 @@ name: "ZF"
 
 input: "data"
 input_shape {
-  dim: 1
-  dim: 3
-  dim: 224
-  dim: 224
+    dim: 1
+    dim: 3
+    dim: 224
+    dim: 224
 }
 
 input: "rois"
 input_shape {
-  dim: 1
-  dim: 5
+    dim: 1
+    dim: 5
 }
 
 #========= conv1-conv5 ============
@@ -21,8 +21,8 @@ layer {
     type: "Convolution"
     bottom: "data"
     top: "conv1"
-    param { lr_mult: 0 }
-    param { lr_mult: 0 }
+    param { lr_mult: 1.0 }
+    param { lr_mult: 1.0 }
     convolution_param {
         num_output: 96
         kernel_size: 7
@@ -65,8 +65,8 @@ layer {
     type: "Convolution"
     bottom: "pool1"
     top: "conv2"
-    param { lr_mult: 0 }
-    param { lr_mult: 0 }
+    param { lr_mult: 1.0 }
+    param { lr_mult: 1.0 }
     convolution_param {
         num_output: 256
         kernel_size: 5
@@ -110,8 +110,8 @@ layer {
     type: "Convolution"
     bottom: "pool2"
     top: "conv3"
-    param { lr_mult: 0 }
-    param { lr_mult: 0 }
+    param { lr_mult: 1.0 }
+    param { lr_mult: 1.0 }
     convolution_param {
         num_output: 384
         kernel_size: 3
@@ -131,8 +131,8 @@ layer {
     type: "Convolution"
     bottom: "conv3"
     top: "conv4"
-    param { lr_mult: 0 }
-    param { lr_mult: 0 }
+    param { lr_mult: 1.0 }
+    param { lr_mult: 1.0 }
     convolution_param {
         num_output: 384
         kernel_size: 3
@@ -152,8 +152,8 @@ layer {
     type: "Convolution"
     bottom: "conv4"
     top: "conv5"
-    param { lr_mult: 0 }
-    param { lr_mult: 0 }
+    param { lr_mult: 1.0 }
+    param { lr_mult: 1.0 }
     convolution_param {
         num_output: 256
         kernel_size: 3
@@ -169,26 +169,36 @@ layer {
     top: "conv5"
 }
 
-layer {
-  name: "roi_pool_conv5"
-  type: "ROIPooling"
-  bottom: "conv5"
-  bottom: "rois"
-  top: "roi_pool_conv5"
-  roi_pooling_param {
-    pooled_w: 6
-    pooled_h: 6
-    spatial_scale: 0.25 # 1/4
-  }
-}
+# layer {
+#   name: "roi_pool_conv5"
+#   type: "ROIPooling"
+#   bottom: "conv5"
+#   bottom: "rois"
+#   top: "roi_pool_conv5"
+#   roi_pooling_param {
+#     pooled_w: 6
+#     pooled_h: 6
+#     spatial_scale: 0.25 # 1/4
+#   }
+# }
+
+# layer {
+#   name: "fc6"
+#   type: "InnerProduct"
+#   bottom: "roi_pool_conv5"
+#   top: "fc6"
+#   inner_product_param {
+#     num_output: 4096
+#   }
+# }
 
 layer {
-  name: "fc6"
-  type: "InnerProduct"
-  bottom: "roi_pool_conv5"
-  top: "fc6"
-  inner_product_param {
-    num_output: 4096
-  }
+    name: "concat"
+    type: "Concat"
+    bottom: "conv3"
+    bottom: "conv5"
+    top: "feat"
+    concat_param{
+        axis:1
+    }
 }
-

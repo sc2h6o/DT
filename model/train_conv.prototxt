@@ -4,6 +4,7 @@ layer {
     type: 'Python'
     top: 'data'
     top: 'labels'
+    top: 'labels_seg'
     python_param {
     module: 'conv_data_layer.layer'
     layer: 'DataLayer'
@@ -58,6 +59,29 @@ layer {
         }
     }
 }
+
+layer {
+    name: "score_seg"
+    type: "Deconvolution"
+    bottom: "conv6"
+    top: "score_seg"
+    param { lr_mult: 1.0 }
+    param { lr_mult: 2.0 }
+    convolution_param {
+        num_output: 2
+        kernel_size: 1
+        stride: 1
+        weight_filler {
+            type: "gaussian"
+            std: 0.01
+        }
+        bias_filler {
+            type: "constant"
+            value: 0
+        }
+    }
+}
+
 layer {
     name: "loss"
     type: "SoftmaxWithLoss"
@@ -67,6 +91,20 @@ layer {
     propagate_down: 0
     top: "loss"
     loss_weight: 1
+    loss_param {
+    ignore_label: -1
+    normalize: true
+    }
+}
+layer {
+    name: "loss_seg"
+    type: "SoftmaxWithLoss"
+    bottom: "score_seg"
+    bottom: "labels_seg"
+    propagate_down: 1
+    propagate_down: 0
+    top: "loss_seg"
+    loss_weight: 0.1
     loss_param {
     ignore_label: -1
     normalize: true

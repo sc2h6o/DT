@@ -39,6 +39,10 @@ class DataLayer(caffe.Layer):
         self._name_to_top_map['labels'] = idx
         idx += 1
 
+        # labels blob: holds a batch of N matrix, one-forth size of the image
+        top[idx].reshape(1, 1,56,56)
+        self._name_to_top_map['labels_seg'] = idx
+        idx += 1
 
         print 'DataLayer: name_to_top:', self._name_to_top_map
         assert len(top) == len(self._name_to_top_map)

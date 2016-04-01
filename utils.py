@@ -45,9 +45,9 @@ def transform_inv(bbox, delta):
 	y = cy - 0.5 * h
 	return (int(round(x)),int(round(y)),int(round(w)),int(round(h)))
 
-def padding(bbox, scale):
+def padding(bbox, scale, minpad):
 	x,y,w,h = bbox
-	pad = int(scale*min(w,h))
+	pad = max(int(scale*min(w,h)), minpad)
 	x -= pad
 	y -= pad
 	w += 2 * pad
