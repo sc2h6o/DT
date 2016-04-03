@@ -176,8 +176,8 @@ layer {
 #   bottom: "rois"
 #   top: "roi_pool_conv5"
 #   roi_pooling_param {
-#     pooled_w: 6
-#     pooled_h: 6
+#     pooled_w: 2
+#     pooled_h: 2
 #     spatial_scale: 0.25 # 1/4
 #   }
 # }
