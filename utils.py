@@ -9,6 +9,9 @@ def int_(x):
 	else:
 		return int(x+1)
 
+def rdint(x):
+	return int(round(x))
+
 def IoU(box1, box2):
 	x1 = max(box1[0], box2[0])
 	y1 = max(box1[1], box2[1])
@@ -54,25 +57,6 @@ def padding(bbox, scale, minpad):
 	h += 2 * pad
 	return (x,y,w,h)
 
-def rdint(x):
-	return int(round(x))
-
 def scaleBox(bbox, scale):
 	x,y,w,h = bbox
 	return (rdint(scale*x), rdint(scale*y), rdint(scale*w), rdint(scale*h))
-
-def softmax(blob):
-	zp = np.exp(blob[1])
-	zn = np.exp(blob[0])
-	return zp/(zp+zn)
-
-def softmaxColor(blob):
-	color = np.zeros((3, blob.shape[1], blob.shape[2]))
-	zs = np.exp(blob).sum(axis=0)
-	cmap = [[1,1,1],[1,0,0],[0,1,0],[0,0,1],[1,1,0]]
-	for i in range(1,6):
-		z = np.exp(blob[i])/zs
-		color[0] = color[0] + cmap[i-1][0] * z
-		color[1] = color[1] + cmap[i-1][1] * z
-		color[2] = color[2] + cmap[i-1][2] * z
-		return color.transpose(1,2,0)

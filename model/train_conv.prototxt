@@ -8,7 +8,7 @@ layer {
     python_param {
     module: 'conv_data_layer.layer'
     layer: 'DataLayer'
-    param_str: "'num_classes': 1"
+   param_str: " 'data': {'channels': 640, 'height': 56, 'width': 56} "
     }
 }
 

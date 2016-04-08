@@ -7,8 +7,8 @@ import numpy as np
 import random
 import time
 from math import *
+import dproc
 from utils import *
-from DataBase import DataBase
 
 video_dir = '/media/syc/My Passport/_dataset/tracking2013/'
 video_name = "Shaking/img"
@@ -42,65 +42,9 @@ class DeepTracker:
 		self.mean = np.array([102.9801, 115.9465, 122.7717])
 		self.idx = 0
 
-	def transpose(self, frame, bbox=None):
-		if bbox == None:
-			data = frame
-		else:
-			(x,y,w,h) = bbox
-			pad = 200
-			_frame = np.zeros((frame.shape[0] + 2*pad, frame.shape[1] + 2*pad, 3))
-			_frame[pad:pad+frame.shape[0], pad:pad+frame.shape[1], :] = frame
-			data = _frame[pad+y:pad+y+h, pad+x:pad+x+w, :]
-			# data = cv2.resize(data, (scale*w,scale*h))
-		data = data - self.mean
-		data = data.transpose((2,0,1))
-		return data
-
-
-	def saveImage(self, frame, bbox, idx):
-		x,y,w,h = bbox
-		cv2.imwrite('data/%d.jpg'%idx, frame[y:y+h,x:x+w,:])
-
-	def makeLabels(self, bbox, box_large, w_sm, h_sm, range_out = 0.25, range_in = 0.1, scale=0.25):
-		(_x,_y,_w,_h) = bbox
-		(x,y,w,h) = box_large
-		labels = np.zeros((1,h_sm,w_sm))
-		rad_out = scale*range_out*40
-		rad_in = scale*range_in*min(min(_w,_h),40)
-		cx = scale*(_x+0.5*_w-x)
-		cy = scale*(_y+0.5*_h-y)
-		# x1 = scale*(_x-x)
-		# y1 = scale*(_y-x)
-		# x2 = scale*(_x+_w-x)
-		# y2 = scale*(_y+_h-x)
-
-		labels[0, rdint(cy-rad_out):rdint(cy+rad_out), rdint(cx-rad_out):rdint(cx+rad_out)] = -1
-		labels[0, rdint(cy-rad_in):rdint(cy+rad_in), rdint(cx-rad_in):rdint(cx+rad_in)] = 1
-		# print "*****************************"
-		# print (w_sm,h_sm,rad_out,rad_in)
-		return labels
-
-	def makeLabels2(self, bbox, box_large, w_sm, h_sm, range_out = 0.25, range_in = 0.1, scale=0.25):
-		(_x,_y,_w,_h) = bbox
-		(x,y,w,h) = box_large
-		labels = np.zeros((1,h_sm,w_sm))
-		# rad_out = scale*range_out*40
-		# rad_in = scale*range_in*min(min(_w,_h),40)
-		# cx = scale*(_x+0.5*_w-x)
-		# cy = scale*(_y+0.5*_h-y)
-		pad_w_out = range_out*_w
-		pad_h_out = range_out*_h
-		pad_w_in = range_in*_w
-		pad_h_in = range_in*_h
-		labels[0, rdint(scale*(_y-y-pad_h_out)):rdint(scale*(_y-y+_h+pad_h_out)), rdint(scale*(_x-x-pad_w_out)):rdint(scale*(_x-x+_w+pad_w_out))] = -1
-		labels[0, rdint(scale*(_y-y+pad_h_in)):rdint(scale*(_y-y+_h-pad_h_in)), rdint(scale*(_x-x+pad_w_in)):rdint(scale*(_x-x+_w-pad_w_in))] = 1
-		# labels[0, rdint(cy-rad_out):rdint(cy+rad_out), rdint(cx-rad_out):rdint(cx+rad_out)] = -1
-		# labels[0, rdint(cy-rad_in):rdint(cy+rad_in), rdint(cx-rad_in):rdint(cx+rad_in)] = 1
-		return labels
-
 	def getFeat(self, frame, box_large):
 		(x,y,w,h) = box_large
-		data = self.transpose(frame, box_large)
+		data = dproc.transpose(frame, self.mean, box_large)
 		self.featnet.blobs['data'].reshape(1,3,h,w)
 		self.featnet.blobs['data'].data[0] = data
 		self.featnet.forward()
@@ -112,8 +56,8 @@ class DeepTracker:
 		(x,y,w,h) = box_large = padding(bbox, 1.0, 60)
 		feat = self.getFeat(frame, box_large)
 		(c_sm, h_sm, w_sm) = feat.shape
-		labels = self.makeLabels(bbox, box_large, w_sm, h_sm)
-		labels_seg = self.makeLabels2(bbox, box_large, w_sm, h_sm)
+		labels = dproc.makeLabels(bbox, box_large, w_sm, h_sm)
+		labels_seg = dproc.makeLabelsSeg(bbox, box_large, w_sm, h_sm)
 
 		self.solver.net.blobs['data'].reshape(1,c_sm,h_sm,w_sm)
 		self.solver.net.blobs['data'].data[0] = feat
@@ -178,9 +122,9 @@ class DeepTracker:
 		self.solver.net.blobs['data'].data[0] = feat
 		self.solver.net.forward()
 
-		score = softmax(self.solver.net.blobs['score'].data[0])
-		seg =  softmax(self.solver.net.blobs['score_seg'].data[0])
-		# color = softmaxColor(self.solver.net.blobs['score'].data[0])
+		score = dproc.softmax(self.solver.net.blobs['score'].data[0])
+		seg =  dproc.softmax(self.solver.net.blobs['score_seg'].data[0])
+		# color = dproc.softmaxColor(self.solver.net.blobs['score'].data[0])
 		# color = cv2.resize(color, (w_sm*4,h_sm*4))
 		score_big = cv2.resize(score, (w_sm*4,h_sm*4))
 		seg_big = cv2.resize(seg, (w_sm*4,h_sm*4))

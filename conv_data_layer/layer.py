@@ -24,13 +24,13 @@ class DataLayer(caffe.Layer):
 
         # parse the layer parameter string, which must be valid YAML
         layer_params = yaml.load(self.param_str_)
-
+        dp = layer_params['data']
 
         self._name_to_top_map = {}
 
         # data blob: holds a batch of N images, each with 3 channels
         idx = 0
-        top[idx].reshape(1, 640,56,56)
+        top[idx].reshape(1, dp['channels'],dp['height'],dp['width'])
         self._name_to_top_map['data'] = idx
         idx += 1
 
